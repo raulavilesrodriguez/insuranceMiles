@@ -45,12 +45,14 @@ get_sessionids_from_db <- function(conn = db, expiry = cookie_expiry) {
 
 
 # dataframe that holds usernames, passwords and other user data
-user_base <- tibble::tibble(
-  users = c("user1", "user2"),
-  password = c("pass1", "pass2"),
-  permissions = c("admin", "standard"),
-  name = c("User One", "User Two")
-)
+user_base <- dbReadTable(db, "acceso") |> as_tibble()
+
+#user_base <- tibble::tibble(
+#  users = c("user1", "user2"),
+#  password = c("pass1", "pass2"),
+#  permissions = c("admin", "standard"),
+#  name = c("User One", "User Two")
+#)
 
 ui <- fluidPage(
   # add logout button UI
