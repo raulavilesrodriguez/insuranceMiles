@@ -92,7 +92,23 @@ appCSS <- ".mandatory_star { color: red; }"
 
 
 
-ui <- fluidPage(
+ui <- dashboardPage(
+  dashboardHeader(
+    title = "Millas app",
+    tags$li(
+      class = "dropdown",
+      style = "padding: 8px;",
+      shinyauthr::logoutUI("logout")
+    ),
+    tags$li(
+      class = "dropdown",
+      tags$a(
+        icon("github"),
+        href = "https://github.com/raulavilesrodriguez",
+        title = "Autor"
+      )
+    )
+  ),
   shinyjs::useShinyjs(),
   shinyjs::inlineCSS(appCSS),
   # add logout button UI
