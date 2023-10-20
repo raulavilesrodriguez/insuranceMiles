@@ -100,15 +100,7 @@ ui <- fluidPage(
   # add login panel UI function
   shinyauthr::loginUI(id = "login", cookie_expiry = cookie_expiry),
   # setup table output to show user info after login
-  fluidRow(
-    actionButton("add_button", "Add", icon("plus")),
-    actionButton("edit_button", "Edit", icon("edit")),
-    actionButton("delete_button", "Delete", icon("trash-alt")),
-  ),
-  br(),
-  fluidRow(width="100%",
-           dataTableOutput("responses_table", width = "100%")
-  )
+  tableOutput("responses_table")
 )
 
 server <- function(input, output, session) {

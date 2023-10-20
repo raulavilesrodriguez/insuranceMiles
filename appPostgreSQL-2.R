@@ -53,12 +53,6 @@ get_sessionids_from_db <- function(conn = db, expiry = cookie_expiry) {
 # dataframe that holds usernames, passwords and other user data
 user_base <- dbReadTable(db, "acceso") |> as_tibble()
 
-#user_base <- tibble::tibble(
-#  users = c("user1", "user2"),
-#  password = c("pass1", "pass2"),
-#  permissions = c("admin", "standard"),
-#  name = c("User One", "User Two")
-#)
 
 # create the dataframe to 'titular' database. 
 responses_df <- data.frame(row_id = character(),
@@ -91,39 +85,60 @@ labelMandatory <- function(label) {
 appCSS <- ".mandatory_star { color: red; }"
 
 
-
+#--------Shiny APP---------
 ui <- dashboardPage(
   dashboardHeader(
     title = "Millas app",
     tags$li(
       class = "dropdown",
       style = "padding: 8px;",
-      shinyauthr::logoutUI("logout")
+      shinyauthr::logoutUI("logout") # add logout button UI
     ),
     tags$li(
       class = "dropdown",
       tags$a(
         icon("github"),
-        href = "https://github.com/raulavilesrodriguez",
+        href = "https://raulaviles.netlify.app/",
         title = "Autor"
       )
     )
   ),
-  shinyjs::useShinyjs(),
-  shinyjs::inlineCSS(appCSS),
-  # add logout button UI
-  div(class = "pull-right", shinyauthr::logoutUI(id = "logout")),
-  # add login panel UI function
-  shinyauthr::loginUI(id = "login", cookie_expiry = cookie_expiry),
-  # setup table output to show user info after login
-  fluidRow(
-    actionButton("add_button", "Add", icon("plus")),
-    actionButton("edit_button", "Edit", icon("edit")),
-    actionButton("delete_button", "Delete", icon("trash-alt")),
+  dashboardSidebar(
+    collapsed = TRUE,
+    div(textOutput("welcome"), style = "padding: 20px"),
+    sidebarMenu(
+      menuItem("Dasboard", tabName = "dashboard", icon = icon("dashboard")),
+      menuItem("Widgets", tabName = "widgets", icon = icon("th"))
+    )
   ),
-  br(),
-  fluidRow(width="100%",
-           dataTableOutput("responses_table", width = "100%")
+  dashboardBody(
+    tags$style(HTML(".content { padding: 50px; }")),
+    shinyauthr::loginUI(
+      id = "login", 
+      cookie_expiry = cookie_expiry, 
+    ),
+    shinyjs::useShinyjs(),
+    shinyjs::inlineCSS(appCSS),
+    tags$div(id = "tabs",
+      tabItems(
+        tabItem(tabName = "dashboard",
+                fluidRow(
+                  actionButton("add_button", "Add", icon("plus")),
+                  actionButton("edit_button", "Edit", icon("edit")),
+                  actionButton("delete_button", "Delete", icon("trash-alt")),
+                ),
+                br(),
+                fluidRow(
+                         dataTableOutput("responses_table", width = "100%")
+                )
+        ),
+        tabItem(tabName = "widgets"
+                
+                
+        )
+      )
+    )
+    
   )
 )
 
@@ -149,12 +164,35 @@ server <- function(input, output, session) {
     log_out = reactive(logout_init())
   )
   
+  observe({
+    if (credentials()$user_auth) {
+      shinyjs::removeClass(selector = "body", class = "sidebar-collapse")
+      shinyjs::show("tabs")
+      shinyjs::show(selector = ".main-header")
+      
+    } else {
+      shinyjs::addClass(selector = "body", class = "sidebar-collapse")
+      shinyjs::hide("tabs")
+      shinyjs::hide(selector = ".main-header")
+    }
+  })
+  
+  user_info <- reactive({
+    credentials()$info
+  })
+  
+  output$welcome <- renderText({
+    req(credentials()$user_auth)
+    
+    glue("Bienvenido {user_info()$name}")
+  })
+  
   # pulls out the user information returned from login module
   user_data <- reactive({
     credentials()$info
   })
   
-  output$responses_table <- renderTable({
+  output$responses_table <- DT::renderDataTable({
     # use req to only render results when credentials()$user_auth is TRUE
     req(credentials()$user_auth)
     user_data() %>%
