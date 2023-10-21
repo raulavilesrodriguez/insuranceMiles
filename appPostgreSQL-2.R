@@ -2,6 +2,7 @@ library(config)
 library(DBI)
 library(lubridate)
 library(glue)
+library(fontawesome)
 library(leaflet)
 library(shiny)
 library(DT)
@@ -72,7 +73,49 @@ dbWriteTable(db,
              "responses_df",
              responses_df,
              overwrite = FALSE,
-             append = TRUE)
+             append = TRUE,
+             )
+
+# Check if 'row_id' is already a primary key
+existing_primary_key_query  <- dbGetQuery(db, 
+                                           
+                    "SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'responses_df'
+AND column_name = 'row_id'
+AND column_name IN (
+    SELECT column_name
+    FROM information_schema.table_constraints
+    JOIN information_schema.key_column_usage USING (constraint_catalog, constraint_schema, constraint_name, table_catalog, table_schema, table_name)
+    WHERE constraint_type = 'PRIMARY KEY'
+    AND table_name = 'responses_df'
+);")
+
+
+if (nrow(existing_primary_key_query) == 0) {
+  # 'row_id' is not a primary key, so set it as one
+  dbExecute(db, "ALTER TABLE responses_df ADD PRIMARY KEY (row_id);")
+}
+
+# Check if 'cedula' is already a unique key
+existing_unique_key_query <- dbGetQuery(db,
+                "SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'responses_df'
+AND column_name = 'cedula'
+AND column_name IN (
+    SELECT column_name
+    FROM information_schema.table_constraints
+    JOIN information_schema.key_column_usage USING (constraint_catalog, constraint_schema, constraint_name, table_catalog, table_schema, table_name)
+    WHERE constraint_type = 'UNIQUE'
+    AND table_name = 'responses_df'
+);")
+
+if (nrow(existing_unique_key_query) == 0) {
+  # 'cedula' is not a unique key, so set it as one
+  dbExecute(db, "ALTER TABLE responses_df ADD CONSTRAINT unique_cedula UNIQUE (cedula);")
+}
+
 
 # to mark * any fields in the entry form that are mandatory
 labelMandatory <- function(label) {
@@ -105,7 +148,7 @@ ui <- dashboardPage(
   ),
   dashboardSidebar(
     collapsed = TRUE,
-    div(textOutput("welcome"), style = "padding: 20px"),
+    div(icon("circle-user"), HTML("&nbsp;"), textOutput("welcome"), style = "display: flex; align-items: center; padding: 20px"),
     sidebarMenu(
       menuItem("Dasboard", tabName = "dashboard", icon = icon("dashboard")),
       menuItem("Widgets", tabName = "widgets", icon = icon("th"))
@@ -115,7 +158,8 @@ ui <- dashboardPage(
     tags$style(HTML(".content { padding: 50px; }")),
     shinyauthr::loginUI(
       id = "login", 
-      cookie_expiry = cookie_expiry, 
+      cookie_expiry = cookie_expiry,
+      title = "Ingreso Seguro App"
     ),
     shinyjs::useShinyjs(),
     shinyjs::inlineCSS(appCSS),
@@ -128,7 +172,7 @@ ui <- dashboardPage(
                   actionButton("delete_button", "Delete", icon("trash-alt")),
                 ),
                 br(),
-                fluidRow(
+                fluidRow(width="100%",
                          dataTableOutput("responses_table", width = "100%")
                 )
         ),
@@ -187,16 +231,114 @@ server <- function(input, output, session) {
     glue("Bienvenido {user_info()$name}")
   })
   
-  # pulls out the user information returned from login module
-  user_data <- reactive({
-    credentials()$info
+  # Enter the inputs to make the df reactive to any input changes.
+  responses_df <- reactive({
+    
+    input$submit
+    input$submit_edit
+    input$delete_button
+    
+    dbReadTable(db, "responses_df")
   })
   
+  # Enter the name of the fields that should be manditory to fill out
+  fieldsMandatory <- c("nombre", "sexo", "edad", "millas", "cedula", "email")
+  
+  # Function to observe if all mandatory fields are filled out. 
+  #If TRUE the submit button will become activated
+  observe({
+    
+    mandatoryFilled <-
+      vapply(fieldsMandatory,
+             function(x) {
+               !is.null(input[[x]]) && input[[x]] != ""
+             },
+             logical(1))
+    mandatoryFilled <- all(mandatoryFilled)
+    
+    shinyjs::toggleState(id = "submit", 
+                         condition = mandatoryFilled)
+  })
+  
+  #______Entry form__________
+  entry_form <- function(button_id){
+    
+    showModal(
+      modalDialog(
+        div(id=("entry_form"),
+            tags$head(tags$style(".modal-dialog{ width:400px}")), #Modify the width of the dialog
+            tags$head(tags$style(HTML(".shiny-split-layout > div {overflow: visible}"))), #Necessary to show the input options
+            fluidPage(
+              fluidRow(
+                splitLayout(
+                  cellWidths = c("250px", "100px"),
+                  cellArgs = list(style = "vertical-align: top"),
+                  textInput("nombre", labelMandatory("Nombre"), placeholder = ""),
+                  selectInput("sexo", labelMandatory("Sexo"), multiple = FALSE, choices = c("", "M", "F"))
+                ),
+                sliderInput("edad", labelMandatory("Edad"), 0, 100, 1, ticks = TRUE, width = "354px"),
+                textInput("millas", labelMandatory("Millas"), placeholder = ""),
+                textInput("cedula", labelMandatory("Cedula"), placeholder = ""),
+                textInput("email", labelMandatory("Email"), placeholder = ""),
+                textAreaInput("comentario", "Comentario", placeholder = "", height = 100, width = "354px"),
+                helpText(labelMandatory(""), paste("Campo Obligatorio")),
+                actionButton(button_id, "Submit")
+              ),
+              easyClose = TRUE
+            )
+        )
+      )
+    )
+  }
+  
+  #____Add Data_____
+  # Function to save the data into df format
+  formData <- reactive({
+    
+    formData <- data.frame(row_id = UUIDgenerate(),
+                           nombre = input$nombre,
+                           sexo = input$sexo,
+                           edad = input$edad,
+                           millas = input$millas,
+                           cedula = input$cedula,
+                           email = input$email,
+                           comentario = input$comentario,
+                           creado = as.character(format(Sys.Date(), format="%Y-%m-%d")),
+                           stringsAsFactors = FALSE)
+    return(formData)
+  })
+  
+  # Function to append data to the SQL table
+  appendData <- function(data){
+    quary <- dbWriteTable(db, "responses_df", data, append = TRUE)
+  }
+  
+  # When add button is clicked it will activate the entry_form with an 
+  #action button called submit
+  observeEvent(input$add_button, priority = 20,{
+    
+    entry_form("submit")
+    
+  })
+  
+  # reset and the modal is removed
+  observeEvent(input$submit, priority = 20,{
+    
+    appendData(formData())
+    shinyjs::reset("entry_form")
+    removeModal()
+    
+  })
+  
+  
   output$responses_table <- DT::renderDataTable({
-    # use req to only render results when credentials()$user_auth is TRUE
-    req(credentials()$user_auth)
-    user_data() %>%
-      mutate(across(starts_with("login_time"), as.character))
+    table <- responses_df() %>% select(-row_id) 
+    names(table) <- c(
+      "Nombre", "Sexo", "Edad", "Millas", "Cédula", "Email", "Commentario", "Creado")
+    table <- datatable(table, 
+                       rownames = FALSE,
+                       options = list(searching = FALSE, lengthChange = FALSE)
+    )
   })
 }
 
