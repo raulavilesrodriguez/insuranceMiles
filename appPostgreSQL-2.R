@@ -140,7 +140,7 @@ ui <- dashboardPage(
     tags$li(
       class = "dropdown",
       tags$a(
-        icon("github"),
+        icon("spaghetti-monster-flying"),
         href = "https://raulaviles.netlify.app/",
         title = "Autor"
       )
@@ -330,7 +330,38 @@ server <- function(input, output, session) {
     
   })
   
+  #___Delete Data____
+  deleteData <- reactive({
+    
+    SQL_df <- dbReadTable(db, "responses_df")
+    row_selection <- SQL_df[input$responses_table_rows_selected, "row_id"]
+    
+    quary <- lapply(row_selection, function(nr){
+      dbExecute(db, sprintf("DELETE FROM responses_df WHERE row_id = '%s'", nr))
+    })
+  })
   
+  # Delete rows when selected. Otherwise display error message
+  observeEvent(input$delete_button, priority = 20,{
+    
+    if(length(input$responses_table_rows_selected)>=1 ){
+      deleteData()
+    }
+    
+    showModal(
+      
+      if(length(input$responses_table_rows_selected) < 1 ){
+        modalDialog(
+          title = "Advertencia",
+          paste("Por favor Bro selecciona el/los cliente(s)" ),easyClose = TRUE
+        )
+      })
+  })
+  
+  # ___________Edit DATA_______________
+  
+  
+  #________Displaying the Data Table_____________
   output$responses_table <- DT::renderDataTable({
     table <- responses_df() %>% select(-row_id) 
     names(table) <- c(
