@@ -173,7 +173,7 @@ ui <- dashboardPage(
                 ),
                 br(),
                 fluidRow(width="100%",
-                         dataTableOutput("responses_table", width = "100%")
+                         DT::dataTableOutput("responses_table")
                 )
         ),
         tabItem(tabName = "widgets"
@@ -359,7 +359,55 @@ server <- function(input, output, session) {
   })
   
   # ___________Edit DATA_______________
+  observeEvent(input$edit_button, priority = 20,{
+    
+    SQL_df <- dbReadTable(db, "responses_df")
+    
+    showModal(
+      if(length(input$responses_table_rows_selected) > 1 ){
+        modalDialog(
+          title = "Advertencia",
+          paste("Por favor Broo selecciona solo un cliente" ),easyClose = TRUE)
+      } else if(length(input$responses_table_rows_selected) < 1){
+        modalDialog(
+          title = "Advertencia",
+          paste("Por favor Man selecciona un cliente" ),easyClose = TRUE)
+      })  
+    
+    if(length(input$responses_table_rows_selected) == 1 ){
+      
+      entry_form("submit_edit")
+      
+      updateTextInput(session, "nombre", value = SQL_df[input$responses_table_rows_selected, "nombre"])
+      updateSelectInput(session, "sexo", selected = SQL_df[input$responses_table_rows_selected, "sexo"])
+      updateSliderInput(session, "edad", value = SQL_df[input$responses_table_rows_selected, "edad"])
+      updateTextInput(session, "millas", value = SQL_df[input$responses_table_rows_selected, "millas"])
+      updateTextInput(session, "cedula", value = SQL_df[input$responses_table_rows_selected, "cedula"])
+      updateTextInput(session, "email", value = SQL_df[input$responses_table_rows_selected, "email"])
+      updateTextAreaInput(session, "comentario", value = SQL_df[input$responses_table_rows_selected, "comentario"])
+      
+    }
+    
+  })
   
+  # Update the selected row with the values that were entered in the form
+  observeEvent(input$submit_edit, priority = 20, {
+    
+    SQL_df <- dbReadTable(db, "responses_df")
+    row_selection <- SQL_df[input$responses_table_row_last_clicked, "row_id"] 
+    dbExecute(db, sprintf("UPDATE responses_df SET nombre = $1, sexo = $2, 
+                          edad = $3, millas = $4, cedula = $5, email = $6,
+                          comentario = $7 WHERE row_id = '%s'", row_selection), 
+              param = list(input$nombre,
+                           input$sexo,
+                           input$edad,
+                           input$millas,
+                           input$cedula,
+                           input$email,
+                           input$comentario))
+    removeModal()
+    
+  })
   
   #________Displaying the Data Table_____________
   output$responses_table <- DT::renderDataTable({
@@ -368,7 +416,7 @@ server <- function(input, output, session) {
       "Nombre", "Sexo", "Edad", "Millas", "Cédula", "Email", "Commentario", "Creado")
     table <- datatable(table, 
                        rownames = FALSE,
-                       options = list(searching = FALSE, lengthChange = FALSE)
+                       options = list(searching = TRUE, lengthChange = FALSE)
     )
   })
 }
