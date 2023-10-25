@@ -14,6 +14,8 @@ library(dplyr)
 library(tidyverse)
 library(shinydashboard)
 library(shinyauthr)
+library(readxl)
+library(shinyBS)
 
 #Read the database connection parameters from the config.yml
 config_file <- "config.yml"
@@ -127,9 +129,16 @@ labelMandatory <- function(label) {
 
 appCSS <- ".mandatory_star { color: red; }"
 
+### Button functions ###
+tableDownloadbutton <- function(outputId, label = NULL){
+  tags$a(id = outputId, class = "btn btn-default shiny-download-link", href = "", 
+         target = "_blank", download = NA, icon("download"), label)
+}
+
 
 #--------Shiny APP---------
-ui <- dashboardPage(
+##### UI######
+ui <- dashboardPage(title = "Millas App",
   dashboardHeader(
     title = "Millas app",
     tags$li(
@@ -170,6 +179,7 @@ ui <- dashboardPage(
                   actionButton("add_button", "Add", icon("plus")),
                   actionButton("edit_button", "Edit", icon("edit")),
                   actionButton("delete_button", "Delete", icon("trash-alt")),
+                  uiOutput("download")
                 ),
                 br(),
                 fluidRow(width="100%",
@@ -259,6 +269,7 @@ server <- function(input, output, session) {
     shinyjs::toggleState(id = "submit", 
                          condition = mandatoryFilled)
   })
+  
   
   #______Entry form__________
   entry_form <- function(button_id){
@@ -409,6 +420,28 @@ server <- function(input, output, session) {
     
   })
   
+  #____Download button_____
+  # Download function DataBase
+  download_df <- reactive({
+    download_df <- dbReadTable(db, "responses_df")
+    return(download_df)
+  })
+  
+  output$download_button <- downloadHandler(
+    filename = function() {"respaldo.xlsx"},
+    content = function(file){writexl::write_xlsx(download_df(), file)
+    })
+  
+  output$download <- renderUI({
+    div(class = "download-container",
+        tableDownloadbutton("download_button", label=NULL),
+        bsTooltip(id = "download_button", title = "Descarga", 
+                  placement = "left", trigger = "hover")
+        )
+  })
+  
+  
+  
   #________Displaying the Data Table_____________
   output$responses_table <- DT::renderDataTable({
     table <- responses_df() %>% select(-row_id) 
@@ -416,7 +449,7 @@ server <- function(input, output, session) {
       "Nombre", "Sexo", "Edad", "Millas", "Cédula", "Email", "Commentario", "Creado")
     table <- datatable(table, 
                        rownames = FALSE,
-                       options = list(searching = TRUE, lengthChange = FALSE)
+                       options = list(searching = TRUE, lengthChange = TRUE)
     )
   })
 }
