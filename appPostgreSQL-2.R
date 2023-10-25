@@ -164,7 +164,20 @@ ui <- dashboardPage(title = "Millas App",
     )
   ),
   dashboardBody(
-    tags$style(HTML(".content { padding: 50px; }")),
+    tags$head(
+      tags$link(rel = "stylesheet", type = "text/css", href = "stylesheet.css")
+    ),
+    tags$style(HTML("
+                    .content { padding: 50px; }
+                    
+                    .download-container{
+                      text-align: right;
+                      padding-right: 10px;
+                      top: 0px;
+                      height: 20px;
+                    }
+                    
+                    ")),
     shinyauthr::loginUI(
       id = "login", 
       cookie_expiry = cookie_expiry,
@@ -179,7 +192,10 @@ ui <- dashboardPage(title = "Millas App",
                   actionButton("add_button", "Add", icon("plus")),
                   actionButton("edit_button", "Edit", icon("edit")),
                   actionButton("delete_button", "Delete", icon("trash-alt")),
-                  uiOutput("download")
+                  
+                ),
+                fluidRow(
+                  uiOutput("download"),
                 ),
                 br(),
                 fluidRow(width="100%",
