@@ -165,7 +165,24 @@ ui <- dashboardPage(title = "Millas App",
   ),
   dashboardBody(
     tags$head(
-      tags$link(rel = "stylesheet", type = "text/css", href = "stylesheet.css")
+      tags$link(rel = "stylesheet", type = "text/css", href = "stylesheet.css"),
+      tags$style(
+        HTML("
+      @media only screen and (max-width: 600px) {
+        .responsive-table {
+          width: 100% !important;
+          font-size:80%;
+        }
+      }
+      
+      @media only screen and (min-width: 601px) {
+        .responsive-table {
+          width: 1000px !important;
+          font-size:80%;
+        }
+      }
+    ")
+      )
     ),
     tags$style(HTML("
                     .content { padding: 50px; }
@@ -372,6 +389,15 @@ server <- function(input, output, session) {
   observeEvent(input$delete_button, priority = 20,{
     
     if(length(input$responses_table_rows_selected)>=1 ){
+      showModal(
+        modalDialog(id="delete_modal",
+                    title = "Warning",
+                    paste("Are you sure you want to delete this row?"),
+                    br(),
+                    br(),
+                    actionButton("yes_button", "Yes"),
+                    actionButton("no_button", "No"),
+                    easyClose = TRUE, footer = NULL))
       deleteData()
     }
     
@@ -465,7 +491,13 @@ server <- function(input, output, session) {
       "Nombre", "Sexo", "Edad", "Millas", "Cédula", "Email", "Commentario", "Creado")
     table <- datatable(table, 
                        rownames = FALSE,
-                       options = list(searching = TRUE, lengthChange = TRUE)
+                       options = list(
+                         searching = TRUE, 
+                         lengthChange = TRUE,
+                         bSortClasses = TRUE,iDisplayLength = 10,   width = "100%",
+                         scrollX=TRUE,
+                         autoWidth = TRUE
+                         )
     )
   })
 }
