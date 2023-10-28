@@ -280,6 +280,7 @@ server <- function(input, output, session) {
     input$submit
     input$submit_edit
     input$delete_button
+    input$yes_button
     
     dbReadTable(db, "responses_df")
   })
@@ -375,12 +376,13 @@ server <- function(input, output, session) {
   })
   
   #___Delete Data____
+  row_selection <- reactiveValues(
+    # This will return an empty data frame
+    rows = data.frame()
+  )
+  
   deleteData <- reactive({
-    
-    SQL_df <- dbReadTable(db, "responses_df")
-    row_selection <- SQL_df[input$responses_table_rows_selected, "row_id"]
-    
-    quary <- lapply(row_selection, function(nr){
+    quary <- lapply(row_selection$rows, function(nr){
       dbExecute(db, sprintf("DELETE FROM responses_df WHERE row_id = '%s'", nr))
     })
   })
@@ -389,26 +391,41 @@ server <- function(input, output, session) {
   observeEvent(input$delete_button, priority = 20,{
     
     if(length(input$responses_table_rows_selected)>=1 ){
+      SQL_df <- dbReadTable(db, "responses_df")
+      row_selection$rows <- SQL_df[input$responses_table_rows_selected, "row_id"]
       showModal(
         modalDialog(id="delete_modal",
-                    title = "Warning",
-                    paste("Are you sure you want to delete this row?"),
+                    title = "Advertencia",
+                    paste("Estás seguro de borrar el/los cliente(s)?"),
                     br(),
                     br(),
-                    actionButton("yes_button", "Yes"),
+                    actionButton("yes_button", "Si"),
                     actionButton("no_button", "No"),
                     easyClose = TRUE, footer = NULL))
-      deleteData()
+      
     }
     
-    showModal(
-      
-      if(length(input$responses_table_rows_selected) < 1 ){
+    else if(length(input$responses_table_rows_selected) < 1 ){
+      showModal(
         modalDialog(
           title = "Advertencia",
-          paste("Por favor Bro selecciona el/los cliente(s)" ),easyClose = TRUE
-        )
-      })
+          paste("Por favor selecciona el/los cliente(s)" ),easyClose = TRUE
+        ) 
+      )
+    }
+    
+  })
+  
+  observeEvent(input$yes_button, priority = 20,{
+    
+    deleteData()
+    removeModal()
+    
+  })
+  
+  observeEvent(input$no_button, priority = 20,{
+    removeModal()
+    
   })
   
   # ___________Edit DATA_______________
@@ -420,11 +437,11 @@ server <- function(input, output, session) {
       if(length(input$responses_table_rows_selected) > 1 ){
         modalDialog(
           title = "Advertencia",
-          paste("Por favor Broo selecciona solo un cliente" ),easyClose = TRUE)
+          paste("Por favor selecciona solo un cliente" ),easyClose = TRUE)
       } else if(length(input$responses_table_rows_selected) < 1){
         modalDialog(
           title = "Advertencia",
-          paste("Por favor Man selecciona un cliente" ),easyClose = TRUE)
+          paste("Por favor selecciona un cliente" ),easyClose = TRUE)
       })  
     
     if(length(input$responses_table_rows_selected) == 1 ){
